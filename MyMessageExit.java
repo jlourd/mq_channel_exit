@@ -1,44 +1,33 @@
-import com.ibm.mq.*;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import com.ibm.mq.exit.*;
 
-public class MQCCDTExample {
-    public static void main(String[] args) {
-        MQQueueManager qMgr = null;
+public class ChannelMessageExit implements MQChannelExit {
+    private static final String LOG_FILE = System.getProperty("user.home") + "/mq_messages.log";
 
-        try {
-            // Connect to the queue manager using the CCDT file
-            qMgr = new MQQueueManager("QM1");
-
-            // Open a queue for PUT and GET
-            int openOptions = CMQC.MQOO_INPUT_AS_Q_DEF | CMQC.MQOO_OUTPUT;
-            MQQueue queue = qMgr.accessQueue("MY.QUEUE", openOptions);
-
-            // Create a message
-            MQMessage message = new MQMessage();
-            message.writeString("Hello from Java with CCDT!");
-
-            // Put the message on the queue
-            MQPutMessageOptions pmo = new MQPutMessageOptions();
-            queue.put(message, pmo);
-            System.out.println("Message sent to the queue.");
-
-            // Get a message from the queue
-            MQMessage receivedMessage = new MQMessage();
-            MQGetMessageOptions gmo = new MQGetMessageOptions();
-            queue.get(receivedMessage, gmo);
-            System.out.println("Message received: " + receivedMessage.readStringOfByteLength(receivedMessage.getMessageLength()));
-
-            // Close the queue
-            queue.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                if (qMgr != null) {
-                    qMgr.disconnect();
-                }
-            } catch (MQException e) {
-                e.printStackTrace();
+    @Override
+    public byte[] channelExit(MQChannelExitData channelExitData) {
+        try (PrintWriter logWriter = new PrintWriter(new FileWriter(LOG_FILE, true))) {
+            // Log channel details
+            logWriter.println("Channel Name: " + channelExitData.getChannelName());
+            
+            // Log message details if available
+            if (channelExitData.getMessageBuffer() != null) {
+                String message = new String(channelExitData.getMessageBuffer());
+                logWriter.println("Message Length: " + channelExitData.getMessageBuffer().length);
+                logWriter.println("Message Content: " + message);
+            } else {
+                logWriter.println("No message content.");
             }
+
+            logWriter.println("--------------------------------");
+
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+
+        // Return the message buffer unchanged for normal processing
+        return channelExitData.getMessageBuffer();
     }
 }
