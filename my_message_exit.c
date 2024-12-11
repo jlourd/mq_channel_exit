@@ -1,40 +1,50 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <cmqc.h>
-#include <cmqxc.h>
+#include <cmqec.h>
 
-#define LOG_FILE "/var/log/mq_channel_exit.log"
+#define LOG_FILE "/var/log/channel_exit_messages.log"
 
-/* Message Exit Function */
-void MQENTRY MyMessageExit(
-    PMQVOID    channelExitParms,   /* Channel exit parameter structure */
-    PMQVOID    channelDefinition,  /* Channel definition structure */
-    PMQVOID    dataLength,         /* Length of message data */
-    PMQVOID    messageBuffer       /* Message data */
+/* Dummy Entry Point */
+void MQStart() { ; } /* For consistency only */
+
+/* Channel Exit Function */
+void MQENTRY ChannelExit(
+    PMQCXP  pChannelExitParms,    /* Channel exit parameter structure */
+    PMQCD   pChannelDefinition,   /* Channel definition structure */
+    PMQLONG pDataLength,          /* Length of message data */
+    PMQLONG pAgentBufferLength,   /* Length of agent buffer */
+    PMQVOID pAgentBuffer,         /* Message data (agent buffer) */
+    PMQLONG pExitBufferLength,    /* Length of exit buffer */
+    PMQPTR  pExitBufferAddr       /* Address of exit buffer */
 ) {
-    PMQCXP pCXP = (PMQCXP)channelExitParms;
-    PMQCD  pCD  = (PMQCD)channelDefinition;
-    FILE  *logFile;
+    FILE *logFile;
 
-    /* Open log file */
+    /* Open the log file */
     logFile = fopen(LOG_FILE, "a");
     if (logFile == NULL) {
-        return; /* Exit if log file cannot be opened */
+        /* Cannot open log file */
+        return;
     }
 
-    /* Log channel details */
-    fprintf(logFile, "Channel Name: %.20s\n", pCD->ChannelName);
-    fprintf(logFile, "Exit Reason: %d\n", pCXP->ExitReason);
+    /* Log general channel information */
+    fprintf(logFile, "Channel Name: %.20s\n", pChannelDefinition->ChannelName);
+    fprintf(logFile, "Exit Reason Code: %ld\n", pChannelExitParms->ExitReason);
 
     /* Log message details if available */
-    if (messageBuffer != NULL && *(PMQLONG)dataLength > 0) {
-        fprintf(logFile, "Message Length: %d\n", *(PMQLONG)dataLength);
-        fprintf(logFile, "Message Content: %.*s\n", *(PMQLONG)dataLength, (char *)messageBuffer);
+    if (pAgentBuffer != NULL && *pDataLength > 0) {
+        fprintf(logFile, "Message Length: %ld\n", *pDataLength);
+        fprintf(logFile, "Message Content: %.*s\n", (int)*pDataLength, (char *)pAgentBuffer);
     } else {
-        fprintf(logFile, "No message content available\n");
+        fprintf(logFile, "No message data available\n");
     }
+
+    /* Log a separator for clarity */
+    fprintf(logFile, "---------------------------------\n");
 
     /* Close the log file */
     fclose(logFile);
+
+    /* Ensure the channel proceeds as normal */
+    pChannelExitParms->ExitResponse = MQXCC_OK;
 }
